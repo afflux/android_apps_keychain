@@ -10,6 +10,13 @@
                 <action android:name="android.security.IKeyChainService"/>
             </intent-filter>
         </service>
+
+        <service android:name="com.android.keychain.CryptOracleService">
+            <intent-filter>
+                <action android:name="android.security.ICryptOracleService"/>
+            </intent-filter>
+        </service>
+
         <activity android:name="com.android.keychain.KeyChainActivity"
                   android:theme="@style/Transparent"
 		  android:excludeFromRecents="true">
@@ -18,6 +25,16 @@
                 <category android:name="android.intent.category.DEFAULT"/>
             </intent-filter>
         </activity>
+
+        <activity android:name="com.android.keychain.KeyChainGenerateActivity"
+                  android:theme="@style/Transparent"
+		  android:excludeFromRecents="true">
+            <intent-filter>
+	        <action android:name="com.android.keychain.GENERATE"/>
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <receiver android:name=".KeyChainBroadcastReceiver">
             <intent-filter>
                 <action android:name="android.intent.action.PACKAGE_REMOVED" />

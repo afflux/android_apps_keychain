@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+    <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="15dip">
+
+        <TextView android:id="@+id/app_header"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:padding="6dip" />
+
+        <TextView android:id="@+id/error"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@android:color/holo_red_dark"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+        <TextView android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/algorithm" />
+        <Spinner android:id="@+id/algorithm"
+            	android:entries="@array/algorithms_array"
+			    android:layout_width="fill_parent"
+			    android:layout_height="wrap_content" />
+        
+        <TextView android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/credential_name" />
+        <EditText android:id="@+id/credential_name"
+            	android:inputType="text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:imeOptions="actionNext|flagNoExtractUi|flagForceAscii"
+                android:singleLine="True"/>
+        
+        <TextView android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/key_size" />
+        <EditText android:id="@+id/key_size"
+            	android:inputType="number"
+            	android:imeOptions="actionNext|flagNoExtractUi"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:singleLine="True"/>
+        
+        <TextView android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/expiry_date" />
+        <EditText android:id="@+id/expiry_date"
+            	android:inputType="date"
+            	android:imeOptions="actionNext|flagNoExtractUi"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:singleLine="True"/>
+        
+        <Button android:id="@+id/generate_button"
+            	android:text="@android:string/ok"
+            	android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+    </LinearLayout>
+</ScrollView>
