@@ -7,6 +7,7 @@ import android.os.IBinder;
 import android.os.RemoteException;
 import android.security.Credentials;
 import android.security.ICryptOracleService;
+import android.security.KeyChain;
 import android.security.KeyStore;
 import android.util.Log;
 
@@ -111,6 +112,19 @@ public class CryptOracleService extends IntentService {
         }
 
         private PrivateKey getPrivKey(String alias) throws RemoteException {
+            final int callingUid = getCallingUid();
+
+            Log.d(TAG, "checking grant for " + callingUid + " to " + alias);
+            try {
+                KeyChain.KeyChainConnection connection = KeyChain.bind(CryptOracleService.this);
+                if (!connection.getService().hasGrant(callingUid, alias))
+                    throw suppressedRemoteException(new IllegalStateException("uid " + callingUid
+                            + " doesn't have permission to access the requested alias"));
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+                Log.d(TAG, "interrupted while granting access", ignored);
+            }
+
             byte[] encodedKey = this.mKeyStore.get(Credentials.USER_PRIVATE_KEY + alias);
             try {
                 return KeyFactory.getInstance("RSA").generatePrivate(
