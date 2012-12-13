@@ -33,6 +33,7 @@
 
     <!-- Label of button to send the user to the CertInstaller to install a certificate -->
     <string name="install_new_cert_button_label">Install</string>
+    <string name="generate_new_cert_button_label">Generate</string>
 
     <!-- Label of button to send the allow the application certificate request -->
     <string name="allow_button">Allow</string>

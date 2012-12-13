@@ -34,6 +34,13 @@
         android:layout_width="fill_parent"
         android:layout_height="wrap_content">
         <Button
+            android:id="@+id/cert_chooser_generate_button"
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:text="@string/generate_new_cert_button_label"
+            android:layout_margin="6dip"
+        />
+        <Button
             android:id="@+id/cert_chooser_install_button"
             android:layout_height="wrap_content"
             android:layout_width="wrap_content"
