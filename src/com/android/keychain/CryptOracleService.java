@@ -18,7 +18,9 @@ import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
+import java.security.Provider;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.cert.Certificate;
@@ -30,13 +32,42 @@ import java.text.MessageFormat;
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.KeyGenerator;
+import javax.crypto.Mac;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 
 /**
  * @author Kjell Braden <kjell.braden@stud.tu-darmstadt.de>
  */
 public class CryptOracleService extends Service {
+    private final class BCX509Provider extends Provider {
+        private static final long serialVersionUID = -4762217168644088168L;
+
+        private BCX509Provider() {
+            super("BCX509", 1, "custom BC provider providing X509 KeyFactory");
+
+            addService(
+                    "KeyFactory",
+                    "X509",
+                    com.android.org.bouncycastle.jcajce.provider.asymmetric.x509.KeyFactory.class
+                            .getCanonicalName());
+        }
+
+        private void addService(String type, String algo, String className) {
+            setProperty(type + "." + algo, className);
+            putService(new Provider.Service(this, type, algo, className, null,
+                    null));
+        }
+    }
+
+    public static final String DEFAULT_PROVIDER = "BC";
     private static final String TAG = "KeyChain";
+
+    public static final String USER_SYMKEY = "USRSKEY_";
+
+    private final Provider bcX509Provider = new BCX509Provider();
 
     private final ICryptOracleService.Stub mICryptOracleService = new ICryptOracleService.Stub() {
         private final KeyStore mKeyStore = KeyStore.getInstance();
@@ -74,6 +105,14 @@ public class CryptOracleService extends Service {
             }
         }
 
+        @Override
+        public void deleteSymmetricKey(String alias) throws RemoteException {
+            if (!checkGrant(alias))
+                throw suppressedRemoteException(new StringAliasNotFoundException());
+
+            this.mKeyStore.delete(USER_SYMKEY + alias);
+        }
+
         /**
          * helper method for cipher operations, ie. en- and decrypting.
          * 
@@ -105,7 +144,7 @@ public class CryptOracleService extends Service {
 
             try {
                 Log.v(TAG, "loading cipher");
-                Cipher c = Cipher.getInstance(algorithm);
+                Cipher c = Cipher.getInstance(algorithm, DEFAULT_PROVIDER);
 
                 Log.v(TAG, "init cipher");
                 c.init(mode, key);
@@ -119,6 +158,9 @@ public class CryptOracleService extends Service {
             } catch (InvalidKeyException e) {
                 throw new IllegalArgumentException("key unusable - algorithm \""
                         + key.getAlgorithm() + "\" not supported");
+            } catch (NoSuchProviderException e) {
+                throw new IllegalArgumentException("default provider "
+                        + DEFAULT_PROVIDER + " unavailable!");
             }
         }
 
@@ -137,6 +179,26 @@ public class CryptOracleService extends Service {
             }
         }
 
+        @Override
+        public void generateSymmetricKey(String alias, String algorithm,
+                int keysize) throws RemoteException {
+            if (isUsedAlias(alias))
+                throw suppressedRemoteException(new IllegalArgumentException(
+                        "alias in use"));
+
+            try {
+                KeyGenerator gen = KeyGenerator.getInstance(algorithm,
+                        DEFAULT_PROVIDER);
+                gen.init(keysize);
+                SecretKey key = gen.generateKey();
+
+                setGrant(alias);
+                this.mKeyStore.put(USER_SYMKEY + alias, key.getEncoded());
+            } catch (GeneralSecurityException e) {
+                throw suppressedRemoteException(e);
+            }
+        }
+
         private PrivateKey getPrivKey(String alias) throws RemoteException {
             if (!checkGrant(alias))
                 throw suppressedRemoteException(new StringAliasNotFoundException());
@@ -146,20 +208,13 @@ public class CryptOracleService extends Service {
                 throw suppressedRemoteException(new StringAliasNotFoundException());
 
             try {
-                return KeyFactory.getInstance("RSA").generatePrivate(
-                        new PKCS8EncodedKeySpec(encodedKey));
+                // TODO make key type independent
+                return KeyFactory.getInstance("X509",
+                        CryptOracleService.this.bcX509Provider)
+                        .generatePrivate(new PKCS8EncodedKeySpec(encodedKey));
             } catch (GeneralSecurityException e) {
                 throw suppressedRemoteException(e);
             }
-
-            // final OpenSSLEngine engine =
-            // OpenSSLEngine.getInstance("keystore");
-            // try {
-            // return engine.getPrivateKeyById(Credentials.USER_PRIVATE_KEY +
-            // alias);
-            // } catch (InvalidKeyException e) {
-            // throw suppressedRemoteException(e);
-            // }
         }
 
         private Certificate getPubCert(String alias) throws RemoteException {
@@ -171,13 +226,80 @@ public class CryptOracleService extends Service {
                 throw suppressedRemoteException(new StringAliasNotFoundException());
 
             try {
-                CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
-                Certificate cert = certFactory.generateCertificate(new ByteArrayInputStream(
-                        byteCert));
+                CertificateFactory certFactory = CertificateFactory
+                        .getInstance("X.509", DEFAULT_PROVIDER);
+                Certificate cert = certFactory
+                        .generateCertificate(new ByteArrayInputStream(byteCert));
                 return cert;
+            } catch (NoSuchProviderException e) {
+                throw suppressedRemoteException(new IllegalArgumentException(
+                        "default provider " + DEFAULT_PROVIDER
+                                + " unavailable!"));
             } catch (CertificateException e) {
                 throw suppressedRemoteException(e);
             }
+        }
+
+        private SecretKey getSecretKey(String alias, String algorithm)
+                throws RemoteException {
+            if (!checkGrant(alias))
+                throw suppressedRemoteException(new StringAliasNotFoundException());
+
+            byte[] encodedKey = this.mKeyStore.get(USER_SYMKEY + alias);
+            if (encodedKey == null)
+                throw suppressedRemoteException(new StringAliasNotFoundException());
+
+            try {
+                return new SecretKeySpec(encodedKey, algorithm);
+            } catch (IllegalArgumentException e) {
+                throw suppressedRemoteException(e);
+            }
+        }
+
+        @Override
+        public void importSymmetricKey(String alias, byte[] key)
+                throws RemoteException {
+            if (isUsedAlias(alias))
+                throw suppressedRemoteException(new IllegalArgumentException(
+                        "alias in use"));
+
+            setGrant(alias);
+            this.mKeyStore.put(USER_SYMKEY + alias, key);
+        }
+
+        private boolean isUsedAlias(String alias) {
+            return this.mKeyStore.contains(USER_SYMKEY + alias)
+                    || this.mKeyStore.contains(Credentials.USER_CERTIFICATE
+                            + alias);
+        }
+
+        @Override
+        public byte[] mac(String alias, String algorithm, byte[] data)
+                throws RemoteException {
+            SecretKey key = getSecretKey(alias, algorithm);
+
+            if (algorithm == null)
+                throw new IllegalArgumentException(
+                        "key unusable - unknown algorithm");
+            try {
+                Log.v(TAG, "loading mac");
+                Mac m = Mac.getInstance(algorithm, DEFAULT_PROVIDER);
+
+                Log.v(TAG, "init mac");
+                m.init(key);
+                Log.v(TAG, "running mac");
+                byte[] processedData = m.doFinal(data);
+                Log.v(TAG, "returning result");
+                return processedData;
+            } catch (GeneralSecurityException e) {
+                throw suppressedRemoteException(e);
+            }
+        }
+
+        @Override
+        public byte[] retrieveSymmetricKey(String alias, String algorithm)
+                throws RemoteException {
+            return getSecretKey(alias, algorithm).getEncoded();
         }
 
         private void setGrant(String alias) throws RemoteException {
@@ -201,10 +323,13 @@ public class CryptOracleService extends Service {
         }
 
         @Override
-        public byte[] sign(String alias, String algorithm, byte[] data) throws RemoteException {
+        public byte[] sign(String alias, String hashAlgorithm, byte[] data) throws RemoteException {
             try {
-                Signature sig = Signature.getInstance(algorithm);
-                sig.initSign(getPrivKey(alias));
+                PrivateKey key = getPrivKey(alias);
+                String sigAlgo = signatureAlgorithm(hashAlgorithm, key);
+                Signature sig = Signature.getInstance(sigAlgo,
+                        DEFAULT_PROVIDER);
+                sig.initSign(key);
                 sig.update(data);
                 return sig.sign();
             } catch (GeneralSecurityException e) {
@@ -215,6 +340,10 @@ public class CryptOracleService extends Service {
         @Override
         public void storePublicCertificate(String alias, byte[] pemEncodedCert)
                 throws RemoteException {
+            if (isUsedAlias(alias))
+                throw suppressedRemoteException(new IllegalArgumentException(
+                        "alias in use"));
+
             setGrant(alias);
             this.mKeyStore.put(Credentials.USER_CERTIFICATE + alias, pemEncodedCert);
         }
@@ -227,11 +356,14 @@ public class CryptOracleService extends Service {
         }
 
         @Override
-        public boolean verify(String alias, String algorithm, byte[] data, byte[] signature)
+        public boolean verify(String alias, String hashAlgorithm, byte[] data, byte[] signature)
                 throws RemoteException {
             try {
-                Signature sig = Signature.getInstance(algorithm);
-                sig.initVerify(getPubCert(alias));
+                Certificate cert = getPubCert(alias);
+                String sigAlgo = signatureAlgorithm(hashAlgorithm, cert.getPublicKey());
+                Signature sig = Signature.getInstance(sigAlgo,
+                        DEFAULT_PROVIDER);
+                sig.initVerify(cert);
                 sig.update(data);
                 return sig.verify(signature);
             } catch (GeneralSecurityException e) {
@@ -243,5 +375,17 @@ public class CryptOracleService extends Service {
     @Override
     public IBinder onBind(Intent intent) {
         return this.mICryptOracleService;
+    }
+
+    protected String signatureAlgorithm(String hashAlgorithm, Key key) throws InvalidKeyException {
+        String keyAlgo = key.getAlgorithm();
+        if ("RSA".equals(keyAlgo))
+            return hashAlgorithm + "withRSA";
+        if ("DSA".equals(keyAlgo))
+            return hashAlgorithm + "withDSA";
+        if ("EC".equals(keyAlgo) || "ECDSA".equals(keyAlgo))
+            return hashAlgorithm + "withECDSA";
+        
+        throw new InvalidKeyException("signing with key algorithm=" + keyAlgo + " not implemented");
     }
 }

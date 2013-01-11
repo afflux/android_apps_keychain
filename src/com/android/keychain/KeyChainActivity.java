@@ -54,10 +54,12 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
+import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.CertificateEncodingException;
@@ -524,17 +526,26 @@ public class KeyChainActivity extends Activity {
             String expiryDateString = this.expiryDateView.getText().toString();
 
             int keySize;
+            if (KeyChainActivity.this.mKeyStore.contains(CryptOracleService.USER_SYMKEY + alias)
+                    || KeyChainActivity.this.mKeyStore.contains(Credentials.USER_CERTIFICATE
+                            + alias))
+                showError(R.string.alias_in_use);
 
             try {
                 // parse key size
                 keySize = Integer.parseInt(keySizeString);
-                // verify key size
-                // XXX is this necessary?
-                if (!isPowerOfTwo(keySize))
-                    showError(R.string.invalid_key_size, R.string.invalid_pow2);
             } catch (NumberFormatException e) {
                 showError(R.string.invalid_key_size, e.getLocalizedMessage());
                 return;
+            }
+
+            try {
+                // verify key size
+                KeyPairGenerator gen = KeyPairGenerator.getInstance(algorithm,
+                        CryptOracleService.DEFAULT_PROVIDER);
+                gen.initialize(keySize);
+            } catch (GeneralSecurityException e) {
+                showError(R.string.invalid_key_size, e.getLocalizedMessage());
             }
 
             Date expiryDate;
@@ -554,6 +565,9 @@ public class KeyChainActivity extends Activity {
                 dismiss();
                 t.execute();
             } catch (NoSuchAlgorithmException e) {
+                showError(R.string.invalid_algorithm, e.getLocalizedMessage());
+                return;
+            } catch (NoSuchProviderException e) {
                 showError(R.string.invalid_algorithm, e.getLocalizedMessage());
                 return;
             }
@@ -620,9 +634,10 @@ public class KeyChainActivity extends Activity {
          * @see KeyPairGenerator
          * @throws NoSuchAlgorithmException if the given algorithm does not
          *             exist
+         * @throws NoSuchProviderException 
          */
         public GenerateTask(String alias, String algorithm, int keysize, Date endDate)
-                throws NoSuchAlgorithmException {
+                throws NoSuchAlgorithmException, NoSuchProviderException {
             this.alias = alias;
             this.endDate = endDate;
             this.subject = new X500Principal("cn=" + alias);
@@ -630,7 +645,8 @@ public class KeyChainActivity extends Activity {
             this.startDate = new Date();
 
             this.hashAlgorithm = MessageDigest.getInstance("MD5");
-            this.keyPairGenerator = KeyPairGenerator.getInstance(algorithm);
+            this.keyPairGenerator = KeyPairGenerator.getInstance(algorithm,
+                    CryptOracleService.DEFAULT_PROVIDER);
             this.keyPairGenerator.initialize(keysize);
         }
 
@@ -661,7 +677,20 @@ public class KeyChainActivity extends Activity {
             certGen.setIssuerDN(this.subject);
             certGen.setNotBefore(this.startDate);
             certGen.setNotAfter(this.endDate);
-            certGen.setSignatureAlgorithm("sha1WithRSA");
+            
+            String keyAlgo = privKey.getAlgorithm();
+            String sigAlgo;
+            
+            if ("RSA".equals(keyAlgo))
+            	sigAlgo = "sha1WithRSA";
+            else if ("DSA".equals(keyAlgo))
+            	sigAlgo = "sha1WithDSA";
+            else if ("EC".equals(keyAlgo) || "ECDSA".equals(keyAlgo))
+            	sigAlgo = "sha1WithECDSA";
+            else
+            	throw new IllegalArgumentException("can't handle keyAlgo="+keyAlgo);
+            
+            certGen.setSignatureAlgorithm(sigAlgo);
 
             publishProgress(R.string.generate_certificate);
             final X509Certificate cert;
