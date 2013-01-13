@@ -17,9 +17,9 @@
         </service>
         <activity android:name="com.android.keychain.KeyChainActivity"
                   android:theme="@style/Transparent"
-		  android:excludeFromRecents="true">
-	    <intent-filter>
-	        <action android:name="com.android.keychain.CHOOSER"/>
+                  android:excludeFromRecents="true">
+            <intent-filter>
+                <action android:name="com.android.keychain.CHOOSER"/>
                 <category android:name="android.intent.category.DEFAULT"/>
             </intent-filter>
         </activity>
@@ -29,5 +29,17 @@
                 <data android:scheme="package" />
             </intent-filter>
         </receiver>
+        <activity
+            android:theme="@android:style/Theme.Holo.Light"
+            android:name=".manage.KeyManagement"
+            android:label="@string/manageapp_label" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity android:name=".manage.ManageContacts" android:label="@string/manage_contacts" android:theme="@android:style/Theme.Holo.Light" />
+        <activity android:name=".manage.ContactDetails" android:theme="@android:style/Theme.Holo.Light" />
   </application>
 </manifest>

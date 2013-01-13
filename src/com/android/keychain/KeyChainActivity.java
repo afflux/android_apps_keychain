@@ -288,9 +288,6 @@ public class KeyChainActivity extends Activity {
         });
 
         
-        for (String key : getIntent().getExtras().keySet()) {
-            Log.i(TAG, "choosePrivKey with key=" + key + " value=" + getIntent().getExtras().get(key));
-        }
         boolean generateVisibility = getIntent().getBooleanExtra(CryptOracle.EXTRA_GENERATE, false);
         Log.i(TAG,  "choosePrivKey dialog (generate=" + generateVisibility + ")");
         Button generateButton = (Button) footer.findViewById(R.id.cert_chooser_generate_button);
