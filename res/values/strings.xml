@@ -45,6 +45,7 @@
         <item>RSA</item>
         <item>DSA</item>
         <item>EC</item>
+        <item>AES</item>
     </string-array>
     <string name="expiry_date">Expiry Date:</string>
     <string name="key_size">Key Size:</string>
@@ -58,6 +59,7 @@
     
     <string name="generate_start">Generating\u2026</string>
     <string name="generate_keypair">Generating key pair\u2026</string>
+    <string name="generate_secret">Generating secret key\u2026</string>
     <string name="generate_certificate">Generating certificate\u2026</string>
     <string name="credential_name">Certificate name:</string>
     <!-- toast message -->
@@ -73,4 +75,9 @@
     <string name="add_key">Add Key</string>
     <string name="key_select">Select Key</string>
     <string name="key_select_description">Select which key to assign to this contact.</string>
+    <string name="private_key">private key</string>
+    <string name="secret_key">secret key</string>
+    <string name="generate_dialog_title">Generate new key</string>
+    <string name="keytype_select">Select key type ID</string>
+    <string name="keytype_select_description">Specify the application defined key type ID used for looking up this key:</string>
 </resources>

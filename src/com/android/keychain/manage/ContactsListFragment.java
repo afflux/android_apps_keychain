@@ -24,9 +24,7 @@ import android.widget.SearchView.OnQueryTextListener;
 
 import com.android.keychain.R;
 
-import java.io.ByteArrayInputStream;
-
-public class CursorLoaderListFragment extends ListFragment
+public class ContactsListFragment extends ListFragment
         implements OnQueryTextListener, LoaderCallbacks<Cursor> {
 
     // This is the Adapter being used to display the list's data.
@@ -119,7 +117,6 @@ public class CursorLoaderListFragment extends ListFragment
     static final String[] CONTACTS_SUMMARY_PROJECTION = new String[] {
             Contacts._ID,
             Contacts.DISPLAY_NAME,
-            Contacts.CONTACT_STATUS,
             Contacts.PHOTO_THUMBNAIL_URI,
             Contacts.LOOKUP_KEY,
     };
@@ -175,9 +172,9 @@ public class CursorLoaderListFragment extends ListFragment
     public void onListItemClick(ListView l, View v, int position, long id) {
         Cursor c = (Cursor) l.getItemAtPosition(position);
         String dn = c.getString(c.getColumnIndex(Contacts.DISPLAY_NAME));
-        String lk = c.getString(c.getColumnIndex(Contacts.LOOKUP_KEY));
+        String ci = c.getString(c.getColumnIndex(Contacts._ID));
         Intent i = new Intent(getActivity(), ContactDetails.class);
-        i.putExtra(ContactDetails.CONTACT_KEY, lk);
+        i.putExtra(ContactDetails.CONTACT_ID, ci);
         i.putExtra(ContactDetails.CONTACT_DISPLAY_NAME, dn);
         startActivity(i);
     }

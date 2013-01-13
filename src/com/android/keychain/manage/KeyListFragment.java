@@ -6,19 +6,16 @@ import android.app.LoaderManager.LoaderCallbacks;
 import android.content.CursorLoader;
 import android.content.Loader;
 import android.database.Cursor;
-import android.net.Uri;
 import android.os.Bundle;
-import android.provider.ContactsContract.Contacts;
 import android.provider.ContactsContract.Data;
-import android.text.TextUtils;
 import android.view.View;
-import android.widget.QuickContactBadge;
+import android.widget.ListView;
 import android.widget.SimpleCursorAdapter;
-
+import android.widget.Toast;
 
 public class KeyListFragment extends ListFragment implements LoaderCallbacks<Cursor> {
 
-    private String contactLookupKey;
+    private String contactLookupId;
     private SimpleCursorAdapter mAdapter;
 
     @Override
@@ -27,8 +24,8 @@ public class KeyListFragment extends ListFragment implements LoaderCallbacks<Cur
 
         setEmptyText("no keys");
 
-        this.contactLookupKey = getActivity().getIntent()
-                .getStringExtra(ContactDetails.CONTACT_KEY);
+        this.contactLookupId = getActivity().getIntent()
+                .getStringExtra(ContactDetails.CONTACT_ID);
 
         // Create an empty adapter we will use to display the loaded data.
         mAdapter = new SimpleCursorAdapter(getActivity(),
@@ -39,24 +36,7 @@ public class KeyListFragment extends ListFragment implements LoaderCallbacks<Cur
                 new int[] {
                         android.R.id.text1, android.R.id.text2
                 }, 0);
-        mAdapter.setViewBinder(new SimpleCursorAdapter.ViewBinder() {
 
-            @Override
-            public boolean setViewValue(View view, Cursor cursor, int columnIndex) {
-                if (!(view instanceof QuickContactBadge))
-                    return false;
-
-                String lk = cursor.getString(columnIndex);
-                Uri uri = Uri.withAppendedPath(Contacts.CONTENT_LOOKUP_URI, lk);
-                ((QuickContactBadge) view).assignContactUri(uri);
-
-                String puri = cursor.getString(cursor.getColumnIndex(Contacts.PHOTO_THUMBNAIL_URI));
-                if (!TextUtils.isEmpty(puri))
-                    ((QuickContactBadge) view).setImageURI(Uri.parse(puri));
-                // TODO default photo
-                return true;
-            }
-        });
         setListAdapter(mAdapter);
 
         // Start out with a progress indicator.
@@ -69,15 +49,14 @@ public class KeyListFragment extends ListFragment implements LoaderCallbacks<Cur
 
     @Override
     public Loader<Cursor> onCreateLoader(int arg0, Bundle arg1) {
-        Uri uri = Data.CONTENT_URI;
 
         String select = Data.MIMETYPE + " = '" + ManageContacts.MIMETYPE + "' AND "
-                + Contacts.LOOKUP_KEY + " = ?";
-        return new CursorLoader(getActivity(), uri,
+                + Data.CONTACT_ID + " = ?";
+        return new CursorLoader(getActivity(), Data.CONTENT_URI,
                 new String[] {
                         Data._ID, Data.DATA1, Data.DATA2
                 }, select, new String[] {
-                    this.contactLookupKey
+                        this.contactLookupId
                 },
                 Data.DATA1 + " ASC");
     }
@@ -102,5 +81,11 @@ public class KeyListFragment extends ListFragment implements LoaderCallbacks<Cur
         // above is about to be closed. We need to make sure we are no
         // longer using it.
         mAdapter.swapCursor(null);
+    }
+
+    @Override
+    public void onListItemClick(ListView l, View v, int position, long id) {
+        // TODO
+        Toast.makeText(getActivity(), "not yet implemented", Toast.LENGTH_SHORT).show();
     }
 }
