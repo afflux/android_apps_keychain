@@ -5,7 +5,6 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
 import android.os.RemoteException;
-import android.security.Credentials;
 import android.security.CryptOracle.StringAliasNotFoundException;
 import android.security.ICryptOracleService;
 import android.security.KeyChain;
@@ -14,6 +13,7 @@ import android.util.Log;
 
 import java.io.ByteArrayInputStream;
 import java.security.GeneralSecurityException;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.KeyFactory;
@@ -35,6 +35,7 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 /**
@@ -64,7 +65,10 @@ public class CryptOracleService extends Service {
     public static final String DEFAULT_PROVIDER = "BC";
     private static final String TAG = "KeyChain";
 
-    public static final String USER_SYMKEY = "USRSKEY_";
+    public static final String PREFIX_COMMON = "CO_";
+    public static final String USER_SYMKEY = PREFIX_COMMON + "USRSKEY_";
+    public static final String USER_CERTIFICATE = PREFIX_COMMON + "USRCERT_";
+    public static final String USER_PRIVATE_KEY = PREFIX_COMMON + "USRPKEY_";
 
     private final Provider bcX509Provider = new BCX509Provider();
 
@@ -93,12 +97,12 @@ public class CryptOracleService extends Service {
         }
 
         @Override
-        public byte[] decryptData(String alias, String algorithm, String padding, byte[] encryptedData)
-                throws RemoteException {
+        public byte[] decryptData(String alias, String algorithm, String padding,
+                byte[] encryptedData, byte[] iv) throws RemoteException {
             Key key = getKey(alias, algorithm, true);
 
             try {
-                return doCrypt(Cipher.DECRYPT_MODE, key, padding, encryptedData);
+                return doCrypt(Cipher.DECRYPT_MODE, key, padding, encryptedData, iv);
             } catch (GeneralSecurityException e) {
                 throw suppressedRemoteException(e);
             }
@@ -125,9 +129,10 @@ public class CryptOracleService extends Service {
          * @throws NoSuchPaddingException
          * @throws IllegalBlockSizeException
          * @throws BadPaddingException
+         * @throws InvalidAlgorithmParameterException 
          */
-        private byte[] doCrypt(int mode, Key key, String padding, byte[] data)
-                throws NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {
+        private byte[] doCrypt(int mode, Key key, String padding, byte[] data, byte[] iv)
+                throws NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
 
             Log.d(TAG,
                     MessageFormat.format(
@@ -146,7 +151,10 @@ public class CryptOracleService extends Service {
                 Cipher c = Cipher.getInstance(algorithm, DEFAULT_PROVIDER);
 
                 Log.v(TAG, "init cipher");
-                c.init(mode, key);
+                if (iv != null) {
+                    c.init(mode, key, new IvParameterSpec(iv));
+                } else 
+                    c.init(mode, key);
                 Log.v(TAG, "running cipher");
                 byte[] processedData = c.doFinal(data);
                 Log.v(TAG, "returning result");
@@ -164,11 +172,11 @@ public class CryptOracleService extends Service {
         }
 
         @Override
-        public byte[] encryptData(String alias, String algorithm, String padding, byte[] plainData)
-                throws RemoteException {
+        public byte[] encryptData(String alias, String algorithm, String padding, byte[] plainData,
+                byte[] iv) throws RemoteException {
             Key key = getKey(alias, algorithm, false);
             try {
-                return doCrypt(Cipher.ENCRYPT_MODE, key, padding, plainData);
+                return doCrypt(Cipher.ENCRYPT_MODE, key, padding, plainData, iv);
             } catch (GeneralSecurityException e) {
                 throw suppressedRemoteException(e);
             } catch (RuntimeException e) {
@@ -196,7 +204,7 @@ public class CryptOracleService extends Service {
             }
         }
 
-        private Key getKey(String alias, String algorithm, boolean encrypt) throws RemoteException{
+        private Key getKey(String alias, String algorithm, boolean encrypt) throws RemoteException {
             if (isPK(alias))
                 if (encrypt)
                     return getPrivKey(alias);
@@ -211,7 +219,7 @@ public class CryptOracleService extends Service {
             if (!checkGrant(alias) || !isPK(alias))
                 throw suppressedRemoteException(new StringAliasNotFoundException());
 
-            byte[] encodedKey = this.mKeyStore.get(Credentials.USER_PRIVATE_KEY + alias);
+            byte[] encodedKey = this.mKeyStore.get(USER_PRIVATE_KEY + alias);
             if (encodedKey == null)
                 throw suppressedRemoteException(new StringAliasNotFoundException());
 
@@ -228,7 +236,7 @@ public class CryptOracleService extends Service {
             if (!checkGrant(alias) || !isPK(alias))
                 throw suppressedRemoteException(new StringAliasNotFoundException());
 
-            byte[] byteCert = this.mKeyStore.get(Credentials.USER_CERTIFICATE + alias);
+            byte[] byteCert = this.mKeyStore.get(USER_CERTIFICATE + alias);
             if (byteCert == null)
                 throw suppressedRemoteException(new StringAliasNotFoundException());
 
@@ -275,13 +283,13 @@ public class CryptOracleService extends Service {
         }
 
         private boolean isPK(String alias) {
-            return this.mKeyStore.contains(Credentials.USER_CERTIFICATE + alias);
+            return this.mKeyStore.contains(USER_CERTIFICATE + alias);
         }
-        
+
         private boolean isSecret(String alias) {
             return this.mKeyStore.contains(USER_SYMKEY + alias);
         }
-        
+
         private boolean isUsedAlias(String alias) {
             return isSecret(alias) || isPK(alias);
         }
@@ -358,7 +366,7 @@ public class CryptOracleService extends Service {
                         "alias in use"));
 
             setGrant(alias);
-            this.mKeyStore.put(Credentials.USER_CERTIFICATE + alias, pemEncodedCert);
+            this.mKeyStore.put(USER_CERTIFICATE + alias, pemEncodedCert);
         }
 
         private RemoteException suppressedRemoteException(Throwable e) {
