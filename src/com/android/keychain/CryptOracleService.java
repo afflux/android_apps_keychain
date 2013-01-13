@@ -21,7 +21,6 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.Provider;
-import java.security.PublicKey;
 import java.security.Signature;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
@@ -94,12 +93,12 @@ public class CryptOracleService extends Service {
         }
 
         @Override
-        public byte[] decryptData(String alias, String padding, byte[] encryptedData)
+        public byte[] decryptData(String alias, String algorithm, String padding, byte[] encryptedData)
                 throws RemoteException {
-            PrivateKey privKey = getPrivKey(alias);
+            Key key = getKey(alias, algorithm, true);
 
             try {
-                return doCrypt(Cipher.DECRYPT_MODE, privKey, padding, encryptedData);
+                return doCrypt(Cipher.DECRYPT_MODE, key, padding, encryptedData);
             } catch (GeneralSecurityException e) {
                 throw suppressedRemoteException(e);
             }
@@ -165,13 +164,11 @@ public class CryptOracleService extends Service {
         }
 
         @Override
-        public byte[] encryptData(String alias, String padding, byte[] plainData)
+        public byte[] encryptData(String alias, String algorithm, String padding, byte[] plainData)
                 throws RemoteException {
-
+            Key key = getKey(alias, algorithm, false);
             try {
-                PublicKey pubKey = getPubCert(alias).getPublicKey();
-
-                return doCrypt(Cipher.ENCRYPT_MODE, pubKey, padding, plainData);
+                return doCrypt(Cipher.ENCRYPT_MODE, key, padding, plainData);
             } catch (GeneralSecurityException e) {
                 throw suppressedRemoteException(e);
             } catch (RuntimeException e) {
@@ -199,8 +196,19 @@ public class CryptOracleService extends Service {
             }
         }
 
+        private Key getKey(String alias, String algorithm, boolean encrypt) throws RemoteException{
+            if (isPK(alias))
+                if (encrypt)
+                    return getPrivKey(alias);
+                else
+                    return getPubCert(alias).getPublicKey();
+            if (isSecret(alias))
+                return getSecretKey(alias, algorithm);
+            throw suppressedRemoteException(new StringAliasNotFoundException());
+        }
+
         private PrivateKey getPrivKey(String alias) throws RemoteException {
-            if (!checkGrant(alias))
+            if (!checkGrant(alias) || !isPK(alias))
                 throw suppressedRemoteException(new StringAliasNotFoundException());
 
             byte[] encodedKey = this.mKeyStore.get(Credentials.USER_PRIVATE_KEY + alias);
@@ -208,7 +216,6 @@ public class CryptOracleService extends Service {
                 throw suppressedRemoteException(new StringAliasNotFoundException());
 
             try {
-                // TODO make key type independent
                 return KeyFactory.getInstance("X509",
                         CryptOracleService.this.bcX509Provider)
                         .generatePrivate(new PKCS8EncodedKeySpec(encodedKey));
@@ -218,7 +225,7 @@ public class CryptOracleService extends Service {
         }
 
         private Certificate getPubCert(String alias) throws RemoteException {
-            if (!checkGrant(alias))
+            if (!checkGrant(alias) || !isPK(alias))
                 throw suppressedRemoteException(new StringAliasNotFoundException());
 
             byte[] byteCert = this.mKeyStore.get(Credentials.USER_CERTIFICATE + alias);
@@ -242,7 +249,7 @@ public class CryptOracleService extends Service {
 
         private SecretKey getSecretKey(String alias, String algorithm)
                 throws RemoteException {
-            if (!checkGrant(alias))
+            if (!checkGrant(alias) || !isSecret(alias))
                 throw suppressedRemoteException(new StringAliasNotFoundException());
 
             byte[] encodedKey = this.mKeyStore.get(USER_SYMKEY + alias);
@@ -267,10 +274,16 @@ public class CryptOracleService extends Service {
             this.mKeyStore.put(USER_SYMKEY + alias, key);
         }
 
+        private boolean isPK(String alias) {
+            return this.mKeyStore.contains(Credentials.USER_CERTIFICATE + alias);
+        }
+        
+        private boolean isSecret(String alias) {
+            return this.mKeyStore.contains(USER_SYMKEY + alias);
+        }
+        
         private boolean isUsedAlias(String alias) {
-            return this.mKeyStore.contains(USER_SYMKEY + alias)
-                    || this.mKeyStore.contains(Credentials.USER_CERTIFICATE
-                            + alias);
+            return isSecret(alias) || isPK(alias);
         }
 
         @Override
@@ -385,7 +398,7 @@ public class CryptOracleService extends Service {
             return hashAlgorithm + "withDSA";
         if ("EC".equals(keyAlgo) || "ECDSA".equals(keyAlgo))
             return hashAlgorithm + "withECDSA";
-        
+
         throw new InvalidKeyException("signing with key algorithm=" + keyAlgo + " not implemented");
     }
 }
