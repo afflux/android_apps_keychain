@@ -69,7 +69,6 @@ public class ContactsListFragment extends ListFragment
                     ((QuickContactBadge) view).setImageURI(Uri.parse(puri));
                 else 
                     ((QuickContactBadge) view).setImageResource(R.drawable.ic_contact_picture);
-                // TODO default photo
                 return true;
             }
         });

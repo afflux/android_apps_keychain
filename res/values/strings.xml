@@ -80,4 +80,8 @@
     <string name="generate_dialog_title">Generate new key</string>
     <string name="keytype_select">Select key type ID</string>
     <string name="keytype_select_description">Specify the application defined key type ID used for looking up this key:</string>
+    <string name="grant_key_access_title">Key Access</string>
+
+    <string name="key_requesting_app">The app <xliff:g id="app">%s</xliff:g> has requested access to the key identified by <xliff:g id="alias">%s</xliff:g>. Granting access will let the app use this key without further notice.</string>
+    <string name="key_assigned_contacts">They key is currently assigned to the following contacts:</string>
 </resources>

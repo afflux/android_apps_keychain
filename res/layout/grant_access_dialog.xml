@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LinearLayout
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" >
+    <LinearLayout
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="14dip" >
+
+        <TextView android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:id="@+id/grant_description" />
+
+        <TextView android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/key_assigned_contacts" />
+
+        <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+            <fragment
+                    android:id="@+id/contactList"
+                    android:name="com.android.keychain.manage.KeyContactListFragment"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+        </ScrollView>
+    </LinearLayout>
+
+    <LinearLayout
+            style="?android:attr/buttonBarStyle"
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="4dip"
+            android:paddingStart="0dip"
+            android:paddingEnd="0dip"
+            android:measureWithLargestChild="true" >
+        <Button android:id="@+id/deny_button"
+                style="?android:attr/buttonBarButtonStyle"
+                android:text="@string/deny_button"
+                android:layout_weight="1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        <Button android:id="@+id/allow_button"
+                style="?android:attr/buttonBarButtonStyle"
+                android:text="@string/allow_button"
+                android:layout_weight="1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+    </LinearLayout>
+</LinearLayout>

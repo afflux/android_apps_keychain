@@ -41,6 +41,11 @@
         </activity>
         <activity android:name=".manage.ManageContacts" android:label="@string/manage_contacts" android:theme="@android:style/Theme.Holo.Light" />
         <activity android:name=".manage.ContactDetails" android:theme="@android:style/Theme.Holo.Light" />
-	<activity android:name=".manage.KeySelectListActivity" android:label="@string/key_select" android:theme="@android:style/Theme.Holo.Light" />
+        <activity android:name=".manage.KeySelectListActivity" android:label="@string/key_select" android:theme="@android:style/Theme.Holo.Light" />
+        <activity android:name=".manage.GrantKeyAccessActivity"
+		  android:label="@string/grant_key_access_title"
+                  android:theme="@android:style/Theme.Holo.Dialog"
+                  android:excludeFromRecents="true"
+                  android:exported="true" />
   </application>
 </manifest>
