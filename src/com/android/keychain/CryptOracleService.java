@@ -42,7 +42,7 @@ import javax.crypto.spec.SecretKeySpec;
  * @author Kjell Braden <kjell.braden@stud.tu-darmstadt.de>
  */
 public class CryptOracleService extends Service {
-    private final class BCX509Provider extends Provider {
+    private static final class BCX509Provider extends Provider {
         private static final long serialVersionUID = -4762217168644088168L;
 
         private BCX509Provider() {
@@ -70,7 +70,7 @@ public class CryptOracleService extends Service {
     public static final String USER_CERTIFICATE = PREFIX_COMMON + "USRCERT_";
     public static final String USER_PRIVATE_KEY = PREFIX_COMMON + "USRPKEY_";
 
-    private final Provider bcX509Provider = new BCX509Provider();
+    public static final Provider bcX509Provider = new BCX509Provider();
 
     private final ICryptOracleService.Stub mICryptOracleService = new ICryptOracleService.Stub() {
         private final KeyStore mKeyStore = KeyStore.getInstance();
@@ -225,7 +225,7 @@ public class CryptOracleService extends Service {
 
             try {
                 return KeyFactory.getInstance("X509",
-                        CryptOracleService.this.bcX509Provider)
+                        CryptOracleService.bcX509Provider)
                         .generatePrivate(new PKCS8EncodedKeySpec(encodedKey));
             } catch (GeneralSecurityException e) {
                 throw suppressedRemoteException(e);
