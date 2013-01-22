@@ -5,6 +5,7 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.security.CryptOracle;
 import android.security.CryptOracle.StringAliasNotFoundException;
 import android.security.ICryptOracleService;
 import android.security.KeyChain;
@@ -17,20 +18,24 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
-import java.security.Provider;
+import java.security.PublicKey;
 import java.security.Signature;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.text.MessageFormat;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.KeyAgreement;
 import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 import javax.crypto.NoSuchPaddingException;
@@ -42,26 +47,6 @@ import javax.crypto.spec.SecretKeySpec;
  * @author Kjell Braden <kjell.braden@stud.tu-darmstadt.de>
  */
 public class CryptOracleService extends Service {
-    private static final class BCX509Provider extends Provider {
-        private static final long serialVersionUID = -4762217168644088168L;
-
-        private BCX509Provider() {
-            super("BCX509", 1, "custom BC provider providing X509 KeyFactory");
-
-            addService(
-                    "KeyFactory",
-                    "X509",
-                    com.android.org.bouncycastle.jcajce.provider.asymmetric.x509.KeyFactory.class
-                            .getCanonicalName());
-        }
-
-        private void addService(String type, String algo, String className) {
-            setProperty(type + "." + algo, className);
-            putService(new Provider.Service(this, type, algo, className, null,
-                    null));
-        }
-    }
-
     public static final String DEFAULT_PROVIDER = "BC";
     private static final String TAG = "KeyChain";
 
@@ -69,8 +54,6 @@ public class CryptOracleService extends Service {
     public static final String USER_SYMKEY = PREFIX_COMMON + "USRSKEY_";
     public static final String USER_CERTIFICATE = PREFIX_COMMON + "USRCERT_";
     public static final String USER_PRIVATE_KEY = PREFIX_COMMON + "USRPKEY_";
-
-    public static final Provider bcX509Provider = new BCX509Provider();
 
     private final ICryptOracleService.Stub mICryptOracleService = new ICryptOracleService.Stub() {
         private final KeyStore mKeyStore = KeyStore.getInstance();
@@ -129,10 +112,11 @@ public class CryptOracleService extends Service {
          * @throws NoSuchPaddingException
          * @throws IllegalBlockSizeException
          * @throws BadPaddingException
-         * @throws InvalidAlgorithmParameterException 
+         * @throws InvalidAlgorithmParameterException
          */
         private byte[] doCrypt(int mode, Key key, String padding, byte[] data, byte[] iv)
-                throws NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
+                throws NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException,
+                InvalidAlgorithmParameterException {
 
             Log.d(TAG,
                     MessageFormat.format(
@@ -153,7 +137,7 @@ public class CryptOracleService extends Service {
                 Log.v(TAG, "init cipher");
                 if (iv != null) {
                     c.init(mode, key, new IvParameterSpec(iv));
-                } else 
+                } else
                     c.init(mode, key);
                 Log.v(TAG, "running cipher");
                 byte[] processedData = c.doFinal(data);
@@ -180,6 +164,26 @@ public class CryptOracleService extends Service {
             } catch (GeneralSecurityException e) {
                 throw suppressedRemoteException(e);
             } catch (RuntimeException e) {
+                throw suppressedRemoteException(e);
+            }
+        }
+
+        @Override
+        public byte[] generateKeyPair(String alias, String keyAlgorithm, int keysize)
+                throws RemoteException {
+            if (isUsedAlias(alias))
+                throw suppressedRemoteException(new IllegalArgumentException(
+                        "alias in use"));
+            try {
+                KeyPairGenerator gen = KeyPairGenerator.getInstance(keyAlgorithm, DEFAULT_PROVIDER);
+                gen.initialize(keysize);
+                KeyPair kp = gen.generateKeyPair();
+
+                setGrant(alias);
+                this.mKeyStore.put(USER_PRIVATE_KEY + alias, kp.getPrivate().getEncoded());
+
+                return kp.getPublic().getEncoded();
+            } catch (GeneralSecurityException e) {
                 throw suppressedRemoteException(e);
             }
         }
@@ -214,8 +218,12 @@ public class CryptOracleService extends Service {
                 return getSecretKey(alias, algorithm);
             throw suppressedRemoteException(new StringAliasNotFoundException());
         }
-
+        
         private PrivateKey getPrivKey(String alias) throws RemoteException {
+            return getPrivKey(alias, null);
+        }
+
+        private PrivateKey getPrivKey(String alias, String algorithm) throws RemoteException {
             if (!checkGrant(alias) || !isPK(alias))
                 throw suppressedRemoteException(new StringAliasNotFoundException());
 
@@ -224,9 +232,13 @@ public class CryptOracleService extends Service {
                 throw suppressedRemoteException(new StringAliasNotFoundException());
 
             try {
-                return KeyFactory.getInstance("X509",
-                        CryptOracleService.bcX509Provider)
-                        .generatePrivate(new PKCS8EncodedKeySpec(encodedKey));
+                KeyFactory fact;
+                if (algorithm == null)
+                    fact = KeyFactory.getInstance("X509", CryptOracle.bcX509Provider);
+                else
+                    fact = KeyFactory.getInstance(algorithm);
+                
+                return fact.generatePrivate(new PKCS8EncodedKeySpec(encodedKey));
             } catch (GeneralSecurityException e) {
                 throw suppressedRemoteException(e);
             }
@@ -283,7 +295,8 @@ public class CryptOracleService extends Service {
         }
 
         private boolean isPK(String alias) {
-            return this.mKeyStore.contains(USER_CERTIFICATE + alias);
+            return this.mKeyStore.contains(USER_PRIVATE_KEY + alias)
+                    || this.mKeyStore.contains(USER_CERTIFICATE + alias);
         }
 
         private boolean isSecret(String alias) {
@@ -387,6 +400,33 @@ public class CryptOracleService extends Service {
                 sig.initVerify(cert);
                 sig.update(data);
                 return sig.verify(signature);
+            } catch (GeneralSecurityException e) {
+                throw suppressedRemoteException(e);
+            }
+        }
+
+        @Override
+        public byte[] keyAgreementPhase(String alias, String keyAlgorithm,
+                String agreementAlgorithm, byte[] encodedPublicKey, boolean lastPhase)
+                throws RemoteException {
+            PrivateKey priv = getPrivKey(alias, keyAlgorithm);
+
+            try {
+                KeyAgreement agree = KeyAgreement.getInstance(agreementAlgorithm, DEFAULT_PROVIDER);
+                agree.init(priv);
+
+                PublicKey pub = KeyFactory.getInstance(keyAlgorithm).generatePublic(
+                        new X509EncodedKeySpec(encodedPublicKey));
+
+                Key result = agree.doPhase(pub, lastPhase);
+
+                if (lastPhase) {
+                    this.mKeyStore.delete(USER_PRIVATE_KEY + alias);
+                    this.mKeyStore.put(USER_SYMKEY + alias, agree.generateSecret());
+
+                    return null;
+                } else
+                    return result != null ? result.getEncoded() : null;
             } catch (GeneralSecurityException e) {
                 throw suppressedRemoteException(e);
             }
