@@ -5,16 +5,13 @@ import android.app.Activity;
 import android.app.FragmentTransaction;
 import android.content.Intent;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
-import android.widget.Button;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.android.keychain.R;
 
 public class KeySelectListActivity extends Activity {
-    private KeySelectListFragment mFragment;
+    private KeysListFragment mFragment;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -23,38 +20,12 @@ public class KeySelectListActivity extends Activity {
         setContentView(R.layout.key_chooser);
 
         FragmentTransaction ft = getFragmentManager().beginTransaction();
-        mFragment = new KeySelectListFragment();
+        mFragment = new KeysListFragment();
         ft.add(R.id.keySelectListFrame, mFragment, "keyselectlist");
         ft.commit();
 
         TextView contextView = (TextView) findViewById(R.id.cert_chooser_header);
         contextView.setText(R.string.key_select_description);
-
-        Button installButton = (Button) findViewById(R.id.cert_chooser_install_button);
-        installButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Toast.makeText(KeySelectListActivity.this, "not yet implemented",
-                        Toast.LENGTH_SHORT)
-                        .show();
-                finish(null);
-            }
-        });
-
-        Button generateButton = (Button) findViewById(R.id.cert_chooser_generate_button);
-        generateButton.setVisibility(View.VISIBLE);
-        generateButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                new GenerateDialogFragment(KeySelectListActivity.this).show(getFragmentManager(),
-                        GenerateDialogFragment.TAG);
-            }
-        });
-    }
-
-    public void reloadData() {
-        Log.e("KeySelectListActivity", "reloadData");
-        mFragment.reloadData();
     }
 
     protected void finish(String alias) {
