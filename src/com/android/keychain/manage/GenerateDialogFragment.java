@@ -1,6 +1,7 @@
 
 package com.android.keychain.manage;
 
+import android.app.Activity;
 import android.app.DialogFragment;
 import android.app.ProgressDialog;
 import android.os.AsyncTask;
@@ -149,7 +150,7 @@ public class GenerateDialogFragment extends DialogFragment implements OnClickLis
             if (result == true) {
                 Toast.makeText(mContext, mContext.getString(R.string.cert_is_added, this.alias),
                         Toast.LENGTH_LONG).show();
-                mContext.reloadData();
+                mParentFragment.reloadData();
             } else {
                 Toast.makeText(mContext, mContext.getString(R.string.cert_not_saved, this.alias),
                         Toast.LENGTH_LONG).show();
@@ -218,7 +219,7 @@ public class GenerateDialogFragment extends DialogFragment implements OnClickLis
             if (result == true) {
                 Toast.makeText(mContext, mContext.getString(R.string.cert_is_added, this.alias),
                         Toast.LENGTH_LONG).show();
-                mContext.reloadData();
+                mParentFragment.reloadData();
             } else {
                 Toast.makeText(mContext, mContext.getString(R.string.cert_not_saved, this.alias),
                         Toast.LENGTH_LONG).show();
@@ -246,7 +247,8 @@ public class GenerateDialogFragment extends DialogFragment implements OnClickLis
     static final String TAG = "GenerateDialogFragment";
 
     private Spinner algorithmSelector;
-    private final KeySelectListActivity mContext;
+    private final Activity mContext;
+    private final KeysListFragment mParentFragment;
     private final DateFormat dateFormat;
     private TextView errorView;
     private TextView expiryDateView;
@@ -255,8 +257,9 @@ public class GenerateDialogFragment extends DialogFragment implements OnClickLis
 
     private KeyStore mKeyStore = KeyStore.getInstance();
 
-    public GenerateDialogFragment(KeySelectListActivity ctx) {
+    public GenerateDialogFragment(Activity ctx, KeysListFragment parent) {
         mContext = ctx;
+        mParentFragment = parent;
         dateFormat = android.text.format.DateFormat.getDateFormat(ctx);
     }
 
@@ -301,8 +304,21 @@ public class GenerateDialogFragment extends DialogFragment implements OnClickLis
             KeyPairGenerator gen = KeyPairGenerator.getInstance(algorithm,
                     CryptOracleService.DEFAULT_PROVIDER);
             gen.initialize(keySize);
+        } catch (NoSuchAlgorithmException e) {
+            try {
+                KeyGenerator gen = KeyGenerator.getInstance(algorithm,
+                        CryptOracleService.DEFAULT_PROVIDER);
+                gen.init(keySize);
+            } catch (GeneralSecurityException e1) {
+                showError(R.string.invalid_key_size, e1.getLocalizedMessage());
+                return;
+            }
         } catch (GeneralSecurityException e) {
             showError(R.string.invalid_key_size, e.getLocalizedMessage());
+            return;
+        } catch (IllegalArgumentException e) {
+            showError(R.string.invalid_key_size, e.getLocalizedMessage());
+            return;
         }
 
         Date expiryDate = null;
@@ -364,16 +380,15 @@ public class GenerateDialogFragment extends DialogFragment implements OnClickLis
 
         final Button confirm = (Button) v.findViewById(R.id.generate_button);
         confirm.setOnClickListener(this);
-        
+
         final Button cancel = (Button) v.findViewById(R.id.cancel_button);
         cancel.setOnClickListener(new OnClickListener() {
-            
+
             @Override
             public void onClick(View v) {
                 dismissDialog();
             }
         });
-        
 
         this.algorithmSelector.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 
@@ -382,7 +397,8 @@ public class GenerateDialogFragment extends DialogFragment implements OnClickLis
                 nameView.setEnabled(true);
                 keySizeView.setEnabled(true);
                 confirm.setEnabled(true);
-                expiryDateView.setEnabled(!isSymmetricAlgo((String) parent.getItemAtPosition(position)));
+                expiryDateView.setEnabled(!isSymmetricAlgo((String) parent
+                        .getItemAtPosition(position)));
             }
 
             @Override
@@ -397,7 +413,7 @@ public class GenerateDialogFragment extends DialogFragment implements OnClickLis
         return v;
     }
 
-    protected void dismissDialog() {;
+    protected void dismissDialog() {
         dismiss();
     }
 

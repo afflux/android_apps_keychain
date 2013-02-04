@@ -13,7 +13,7 @@ import android.widget.ListView;
 import android.widget.SimpleCursorAdapter;
 import android.widget.Toast;
 
-public class KeyListFragment extends ListFragment implements LoaderCallbacks<Cursor> {
+public class ContactKeysListFragment extends ListFragment implements LoaderCallbacks<Cursor> {
 
     private String contactLookupId;
     private SimpleCursorAdapter mAdapter;
