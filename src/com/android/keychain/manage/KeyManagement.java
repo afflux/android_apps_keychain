@@ -55,7 +55,8 @@ public class KeyManagement extends Activity {
     }
 
     public void openKeys(View view) {
-        Toast.makeText(this, "not yet implemented", Toast.LENGTH_SHORT).show();
+        Intent intent = new Intent(this, ManageKeys.class);
+        startActivity(intent);
     }
 
     @Override

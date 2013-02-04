@@ -76,7 +76,7 @@
     <string name="key_select">Select Key</string>
     <string name="key_select_description">Select which key to assign to this contact.</string>
     <string name="private_key">private key</string>
-    <string name="secret_key">secret key</string>
+    <string name="secret_key">secret key (<xliff:g id="bits">%d</xliff:g> bit)</string>
     <string name="generate_dialog_title">Generate new key</string>
     <string name="keytype_select">Select key type ID</string>
     <string name="keytype_select_description">Specify the application defined key type ID used for looking up this key:</string>
@@ -84,4 +84,6 @@
 
     <string name="key_requesting_app">The app <xliff:g id="app">%s</xliff:g> has requested access to the key identified by <xliff:g id="alias">%s</xliff:g>. Granting access will let the app use this key without further notice.</string>
     <string name="key_assigned_contacts">They key is currently assigned to the following contacts:</string>
+    <string name="export_error">Couldn\'t export key: <xliff:g id="error">%s</xliff:g>.</string>
+    <string name="export_key_chooser">Choose app to handle exported key.</string>
 </resources>

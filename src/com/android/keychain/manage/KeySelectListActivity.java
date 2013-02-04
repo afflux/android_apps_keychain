@@ -11,7 +11,7 @@ import android.widget.TextView;
 import com.android.keychain.R;
 
 public class KeySelectListActivity extends Activity {
-    private KeysListFragment mFragment;
+    private KeyChooseListFragment mFragment;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -20,7 +20,7 @@ public class KeySelectListActivity extends Activity {
         setContentView(R.layout.key_chooser);
 
         FragmentTransaction ft = getFragmentManager().beginTransaction();
-        mFragment = new KeysListFragment();
+        mFragment = new KeyChooseListFragment();
         ft.add(R.id.keySelectListFrame, mFragment, "keyselectlist");
         ft.commit();
 

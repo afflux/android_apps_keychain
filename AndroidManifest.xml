@@ -40,6 +40,7 @@
             </intent-filter>
         </activity>
         <activity android:name=".manage.ManageContacts" android:label="@string/manage_contacts" android:theme="@android:style/Theme.Holo.Light" />
+        <activity android:name=".manage.ManageKeys" android:label="@string/manage_keys" android:theme="@android:style/Theme.Holo.Light" />
         <activity android:name=".manage.ContactDetails" android:theme="@android:style/Theme.Holo.Light" />
         <activity android:name=".manage.KeySelectListActivity" android:label="@string/key_select" android:theme="@android:style/Theme.Holo.Light" />
         <activity android:name=".manage.GrantKeyAccessActivity"
