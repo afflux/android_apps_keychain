@@ -89,7 +89,7 @@ public class KeysListFragment extends ListFragment implements
         // XXX kills assigned aliases as well
 
         getActivity().getContentResolver().delete(Data.CONTENT_URI,
-                Data.DATA1 + "= ? AND " + Data.MIMETYPE + " = " + ManageContacts.MIMETYPE,
+                Data.DATA1 + "= ? AND " + Data.MIMETYPE + " = '" + ManageContacts.MIMETYPE + "'",
                 new String[] {
                     alias
                 });
