@@ -24,7 +24,7 @@
                 android:layout_weight="1">
             <fragment
                     android:id="@+id/contactList"
-                    android:name="com.android.keychain.manage.KeyContactsListFragment"
+                    android:name="com.android.keychain.manage.KeyContactListFragment"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
         </ScrollView>

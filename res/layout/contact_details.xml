@@ -5,7 +5,7 @@
 
     <fragment
         android:id="@+id/keyList"
-        android:name="com.android.keychain.manage.ContactKeysListFragment"
+        android:name="com.android.keychain.manage.KeyListFragment"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentLeft="true"

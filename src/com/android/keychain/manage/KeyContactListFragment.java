@@ -18,7 +18,7 @@ import android.widget.QuickContactBadge;
 import android.widget.SimpleCursorAdapter;
 import com.android.keychain.R;
 
-public class KeyContactsListFragment extends ListFragment
+public class KeyContactListFragment extends ListFragment
         implements LoaderCallbacks<Cursor> {
 
     // This is the Adapter being used to display the list's data.

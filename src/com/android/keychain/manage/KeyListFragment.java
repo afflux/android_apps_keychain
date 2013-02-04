@@ -3,91 +3,39 @@ package com.android.keychain.manage;
 
 import android.app.ListFragment;
 import android.app.LoaderManager.LoaderCallbacks;
-import android.content.AsyncTaskLoader;
+import android.content.CursorLoader;
 import android.content.Loader;
+import android.database.Cursor;
 import android.os.Bundle;
-import android.security.KeyStore;
-import android.util.Log;
+import android.provider.ContactsContract.Data;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.Checkable;
 import android.widget.ListView;
-import android.widget.SimpleAdapter;
+import android.widget.SimpleCursorAdapter;
 import android.widget.Toast;
 
-import com.android.keychain.CryptOracleService;
-import com.android.keychain.R;
+public class KeyListFragment extends ListFragment implements LoaderCallbacks<Cursor> {
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+    private String contactLookupId;
+    private SimpleCursorAdapter mAdapter;
 
-public class KeysListFragment extends ListFragment implements
-        LoaderCallbacks<List<Map<String, String>>> {
-
-    private List<Map<String, String>> aliasList = new LinkedList<Map<String, String>>();
-    private SimpleAdapter mAdapter;
-
-    public KeysListFragment() {
-    }
-
-    public View onCreateView(android.view.LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.keys_list_fragment, null);
-    }
-    
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
 
-        Button generateButton = (Button) getView().findViewById(R.id.cert_chooser_generate_button);
-        generateButton.setVisibility(View.VISIBLE);
-        generateButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                new GenerateDialogFragment(getActivity(), KeysListFragment.this).show(
-                        getFragmentManager(),
-                        GenerateDialogFragment.TAG);
-            }
-        });
+        setEmptyText("no keys");
 
-        Button installButton = (Button) getView().findViewById(R.id.cert_chooser_install_button);
-        installButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Toast.makeText(getActivity(), "not yet implemented",
-                        Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        // Give some text to display if there is no data. In a real
-        // application this would come from a resource.
-        setEmptyText("No keys");
-
-        // We have a menu item to show in action bar.
-        setHasOptionsMenu(false);
-
-        getListView().setChoiceMode(ListView.CHOICE_MODE_SINGLE);
+        this.contactLookupId = getActivity().getIntent()
+                .getStringExtra(ContactDetails.CONTACT_ID);
 
         // Create an empty adapter we will use to display the loaded data.
-        mAdapter = new SimpleAdapter(getActivity(), aliasList,
-                R.layout.simple_list_item_2_single_choice,
+        mAdapter = new SimpleCursorAdapter(getActivity(),
+                android.R.layout.simple_list_item_2, null,
                 new String[] {
-                        "alias", "type"
+                        Data.DATA1, Data.DATA2
                 },
                 new int[] {
                         android.R.id.text1, android.R.id.text2
-                }) {
-            @Override
-            public View getView(int position, View convertView, ViewGroup parent) {
-                View v = super.getView(position, convertView, parent);
-                Checkable c = (Checkable) v.findViewById(R.id.radio);
-                c.setChecked(getListView().isItemChecked(position));
-                return v;
-            }
-        };
+                }, 0);
 
         setListAdapter(mAdapter);
 
@@ -99,63 +47,27 @@ public class KeysListFragment extends ListFragment implements
         getLoaderManager().initLoader(0, null, this);
     }
 
-    public void reloadData() {
-        getLoaderManager().restartLoader(0, null, this);
-        Log.e("KeySelectListFragment", "reloadData");
+    @Override
+    public Loader<Cursor> onCreateLoader(int arg0, Bundle arg1) {
+
+        String select = Data.MIMETYPE + " = '" + ManageContacts.MIMETYPE + "' AND "
+                + Data.CONTACT_ID + " = ?";
+        return new CursorLoader(getActivity(), Data.CONTENT_URI,
+                new String[] {
+                        Data._ID, Data.DATA1, Data.DATA2
+                }, select, new String[] {
+                        this.contactLookupId
+                },
+                Data.DATA1 + " ASC");
     }
 
     @Override
-    public Loader<List<Map<String, String>>> onCreateLoader(int id, Bundle args) {
-        return new AsyncTaskLoader<List<Map<String, String>>>(getActivity()) {
-            @Override
-            public List<Map<String, String>> loadInBackground() {
-                KeyStore ks = KeyStore.getInstance();
-                String[] pAliasArray = ks.saw(CryptOracleService.USER_PRIVATE_KEY);
-                String[] sAliasArray = ks.saw(CryptOracleService.USER_SYMKEY);
+    public void onLoadFinished(Loader<Cursor> arg0, Cursor data) {
+        // Swap the new cursor in. (The framework will take care of closing the
+        // old cursor once we return.)
+        mAdapter.swapCursor(data);
 
-                if (pAliasArray == null)
-                    pAliasArray = new String[] {};
-                if (sAliasArray == null)
-                    sAliasArray = new String[] {};
-
-                List<Map<String, String>> list = new ArrayList<Map<String, String>>(
-                        pAliasArray.length + sAliasArray.length);
-
-                for (String alias : pAliasArray) {
-                    Map<String, String> map = new HashMap<String, String>(2);
-                    map.put("alias", alias);
-                    map.put("type", getContext().getString(R.string.private_key));
-
-                    list.add(map);
-                }
-
-                for (String alias : sAliasArray) {
-                    Map<String, String> map = new HashMap<String, String>(2);
-                    map.put("alias", alias);
-                    map.put("type", getContext().getString(R.string.secret_key));
-
-                    list.add(map);
-                }
-                Log.e("Blerg", "got new data=" + list);
-                return list;
-            }
-
-            @Override
-            protected void onStartLoading() {
-                forceLoad();
-            }
-        };
-    }
-
-    @Override
-    public void onLoadFinished(Loader<List<Map<String, String>>> loader,
-            List<Map<String, String>> data) {
-        aliasList.clear();
-        aliasList.addAll(data);
-        mAdapter.notifyDataSetChanged();
-
-        Log.e("Blerg", "aliasList set to=" + aliasList);
-
+        // The list should now be shown.
         if (isResumed()) {
             setListShown(true);
         } else {
@@ -164,24 +76,16 @@ public class KeysListFragment extends ListFragment implements
     }
 
     @Override
-    public void onLoaderReset(Loader<List<Map<String, String>>> loader) {
-        mAdapter.notifyDataSetInvalidated();
-        aliasList.clear();
+    public void onLoaderReset(Loader<Cursor> arg0) {
+        // This is called when the last Cursor provided to onLoadFinished()
+        // above is about to be closed. We need to make sure we are no
+        // longer using it.
+        mAdapter.swapCursor(null);
     }
 
     @Override
     public void onListItemClick(ListView l, View v, int position, long id) {
-        l.setItemChecked(position, true);
-    }
-
-    public String getSelectedAlias() {
-        int position = getListView().getCheckedItemPosition();
-        Log.e("Blerg", "currently checked index=" + position);
-        Object selected = getListView().getItemAtPosition(position);
-        Log.e("Blerg", "currently selected=" + selected);
-        if (!(selected instanceof Map<?, ?>))
-            return null;
-        Map<?, ?> selectedItem = (Map<?, ?>) selected;
-        return (String) selectedItem.get("alias");
+        // TODO
+        Toast.makeText(getActivity(), "not yet implemented", Toast.LENGTH_SHORT).show();
     }
 }
