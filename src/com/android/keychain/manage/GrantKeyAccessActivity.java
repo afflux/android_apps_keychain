@@ -20,31 +20,22 @@ import android.widget.TextView;
 import com.android.keychain.CryptOracleService;
 import com.android.keychain.R;
 
-import java.io.ByteArrayInputStream;
 import java.security.GeneralSecurityException;
 import java.security.Key;
-import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
 import java.security.spec.InvalidKeySpecException;
-import java.security.spec.PKCS8EncodedKeySpec;
 
 public class GrantKeyAccessActivity extends Activity {
     private abstract class GrantTask extends AsyncTask<Void, Void, Boolean> {
         private final boolean cancelActivityOnFail;
 
         private final KeyStore mKeyStore = KeyStore.getInstance();
-        private final KeyFactory mKeyFact;
-        private final CertificateFactory mCertFact;
 
         public GrantTask(boolean cancelActivityOnFail) throws NoSuchAlgorithmException,
                 CertificateException, NoSuchProviderException {
             this.cancelActivityOnFail = cancelActivityOnFail;
-            this.mKeyFact = KeyFactory.getInstance("X509", CryptOracle.bcX509Provider);
-            this.mCertFact = CertificateFactory.getInstance("X.509",
-                    CryptOracleService.DEFAULT_PROVIDER);
         }
 
         private final ProgressDialog pd = new ProgressDialog(GrantKeyAccessActivity.this);
@@ -117,10 +108,9 @@ public class GrantKeyAccessActivity extends Activity {
 
             try {
                 if (priv)
-                    return mKeyFact.generatePrivate(new PKCS8EncodedKeySpec(encoded));
+                    return CryptOracleService.parsePrivateKey(encoded);
                 else {
-                    return mCertFact.generateCertificate(new ByteArrayInputStream(encoded))
-                            .getPublicKey();
+                    return CryptOracleService.parseCertificate(encoded).getPublicKey();
                 }
             } catch (InvalidKeySpecException e) {
                 return null;

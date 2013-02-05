@@ -28,6 +28,7 @@ import java.security.Signature;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
+import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.text.MessageFormat;
@@ -218,7 +219,7 @@ public class CryptOracleService extends Service {
                 return getSecretKey(alias, algorithm);
             throw suppressedRemoteException(new StringAliasNotFoundException());
         }
-        
+
         private PrivateKey getPrivKey(String alias) throws RemoteException {
             return getPrivKey(alias, null);
         }
@@ -232,13 +233,7 @@ public class CryptOracleService extends Service {
                 throw suppressedRemoteException(new StringAliasNotFoundException());
 
             try {
-                KeyFactory fact;
-                if (algorithm == null)
-                    fact = KeyFactory.getInstance("X509", CryptOracle.bcX509Provider);
-                else
-                    fact = KeyFactory.getInstance(algorithm);
-                
-                return fact.generatePrivate(new PKCS8EncodedKeySpec(encodedKey));
+                return parsePrivateKey(algorithm, encodedKey);
             } catch (GeneralSecurityException e) {
                 throw suppressedRemoteException(e);
             }
@@ -253,15 +248,7 @@ public class CryptOracleService extends Service {
                 throw suppressedRemoteException(new StringAliasNotFoundException());
 
             try {
-                CertificateFactory certFactory = CertificateFactory
-                        .getInstance("X.509", DEFAULT_PROVIDER);
-                Certificate cert = certFactory
-                        .generateCertificate(new ByteArrayInputStream(byteCert));
-                return cert;
-            } catch (NoSuchProviderException e) {
-                throw suppressedRemoteException(new IllegalArgumentException(
-                        "default provider " + DEFAULT_PROVIDER
-                                + " unavailable!"));
+                return parseCertificate(byteCert);
             } catch (CertificateException e) {
                 throw suppressedRemoteException(e);
             }
@@ -436,6 +423,41 @@ public class CryptOracleService extends Service {
     @Override
     public IBinder onBind(Intent intent) {
         return this.mICryptOracleService;
+    }
+
+    public static PrivateKey parsePrivateKey(String algorithm, byte[] encodedKey)
+            throws InvalidKeySpecException, NoSuchAlgorithmException {
+        KeyFactory fact;
+        if (algorithm == null)
+            fact = KeyFactory.getInstance("X509", CryptOracle.bcX509Provider);
+        else
+            fact = KeyFactory.getInstance(algorithm);
+
+        return parsePrivateKey(fact, encodedKey);
+    }
+
+    public static PrivateKey parsePrivateKey(byte[] encodedKey) throws InvalidKeySpecException {
+        try {
+            return parsePrivateKey((String) null, encodedKey);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("security provider unusable", e);
+        }
+    }
+
+    public static PrivateKey parsePrivateKey(KeyFactory fact, byte[] encodedKey)
+            throws InvalidKeySpecException {
+        return fact.generatePrivate(new PKCS8EncodedKeySpec(encodedKey));
+    }
+
+    public static Certificate parseCertificate(byte[] byteCert) throws CertificateException {
+        try {
+            CertificateFactory certFactory = CertificateFactory.getInstance("X.509",
+                    DEFAULT_PROVIDER);
+            return certFactory.generateCertificate(new ByteArrayInputStream(byteCert));
+        } catch (NoSuchProviderException e) {
+            throw new IllegalStateException("default security provider " + DEFAULT_PROVIDER
+                    + " unusable", e);
+        }
     }
 
     protected String signatureAlgorithm(String hashAlgorithm, Key key) throws InvalidKeyException {

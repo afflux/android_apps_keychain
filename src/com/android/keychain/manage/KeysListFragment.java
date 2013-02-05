@@ -10,10 +10,11 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.Loader;
-import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.ContactsContract.Data;
+import android.security.Credentials;
+import android.security.CryptOracle;
 import android.security.KeyStore;
 import android.util.Log;
 import android.view.View;
@@ -27,12 +28,9 @@ import android.widget.Toast;
 import com.android.keychain.CryptOracleService;
 import com.android.keychain.R;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -47,24 +45,6 @@ public class KeysListFragment extends ListFragment implements
     private static final String KEY_PREFIX = "prefix";
     private static final String KEY_TYPE = "type";
     private static final String TAG = "KeyListFragment";
-    private static final int DEFAULT_BUFFER_SIZE = 128;
-
-    private static String resolvePath(Context context, Uri uri) {
-        if ("content".equalsIgnoreCase(uri.getScheme())) {
-            final String[] projection = {
-                    "_data"
-            };
-            Cursor cursor = null;
-
-            cursor = context.getContentResolver().query(uri, projection, null, null, null);
-            if (cursor.moveToFirst())
-                return cursor.getString(0);
-        } else if ("file".equalsIgnoreCase(uri.getScheme())) {
-            return uri.getPath();
-        }
-
-        return null;
-    }
 
     private List<Map<String, String>> aliasList = new LinkedList<Map<String, String>>();
 
@@ -86,7 +66,7 @@ public class KeysListFragment extends ListFragment implements
 
         ks.delete(prefix + alias);
 
-        // XXX kills assigned aliases as well
+        // XXX this kills assigned aliases as well
 
         getActivity().getContentResolver().delete(Data.CONTENT_URI,
                 Data.DATA1 + "= ? AND " + Data.MIMETYPE + " = '" + ManageContacts.MIMETYPE + "'",
@@ -121,7 +101,7 @@ public class KeysListFragment extends ListFragment implements
             return;
         }
 
-        File outFile = getActivity().getFileStreamPath(alias + ".dat");
+        File outFile = getActivity().getFileStreamPath(alias + ".key");
         FileOutputStream out = null;
         try {
             out = getActivity().openFileOutput(alias + ".dat", Context.MODE_WORLD_READABLE);
@@ -133,7 +113,7 @@ public class KeysListFragment extends ListFragment implements
             exportIntent.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(outFile));
             startActivity(Intent
                     .createChooser(exportIntent, getString(R.string.export_key_chooser)));
-            // XXX exported keys won't get removed from storage
+            // XXX exported keys will stay on storage
         } catch (IOException e) {
             Toast.makeText(getActivity(),
                     getActivity().getString(R.string.export_error, e.getLocalizedMessage()),
@@ -177,56 +157,54 @@ public class KeysListFragment extends ListFragment implements
         return R.layout.manage_key_list_item;
     }
 
-    private void importKey(String path) {
-        // TODO handle private keys
-        try {
-            final KeyStore ks = KeyStore.getInstance();
-            final byte[] key = readFileToByteArray(path);
-
-            AlertDialog.Builder alert = new AlertDialog.Builder(getActivity());
-
-            alert.setTitle("Import key");
-            alert.setMessage(R.string.credential_name);
-
-            // Set an EditText view to get user input
-            final EditText input = new EditText(getActivity());
-            alert.setView(input);
-
-            alert.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
-                public void onClick(DialogInterface dialog, int whichButton) {
-                    String alias = input.getText().toString();
-                    ks.put(alias, key);
-                }
-            });
-
-            alert.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-                public void onClick(DialogInterface dialog, int whichButton) {
-                    dialog.dismiss();
-                }
-            });
-
-            alert.show();
-        } catch (IOException e) {
-            Log.e(TAG, "failed to import key", e);
+    private void importKey(Intent data) {
+        if (data.hasExtra(CryptOracle.EXTRA_SYMKEY)) {
+            importSymKey(data.getByteArrayExtra("symkey"));
+        } else if (data.hasExtra(Credentials.EXTRA_USER_PRIVATE_KEY_NAME)
+                && data.hasExtra(Credentials.EXTRA_USER_CERTIFICATE_NAME)) {
+            importKeyPair(data);
         }
     }
 
-    private static byte[] readFileToByteArray(String path) throws IOException {
-        InputStream inStream = new FileInputStream(path);
-        try {
-            ByteArrayOutputStream outStream = new ByteArrayOutputStream();
-            byte[] buf = new byte[DEFAULT_BUFFER_SIZE];
+    private void importKeyPair(Intent data) {
+        KeyStore ks = KeyStore.getInstance();
+        
+        String privkeyName = data.getStringExtra(Credentials.EXTRA_USER_PRIVATE_KEY_NAME);
+        byte[] privkey = data.getByteArrayExtra(Credentials.EXTRA_USER_PRIVATE_KEY_DATA);
+        
+        String certName = data.getStringExtra(Credentials.EXTRA_USER_CERTIFICATE_NAME);
+        byte[] cert = data.getByteArrayExtra(Credentials.EXTRA_USER_CERTIFICATE_DATA);
+        
+        ks.put(CryptOracleService.PREFIX_COMMON + privkeyName, privkey);
+        ks.put(CryptOracleService.PREFIX_COMMON + certName, cert);
+    }
 
-            int count;
+    private void importSymKey(final byte[] key) {
+        final KeyStore ks = KeyStore.getInstance();
+        AlertDialog.Builder alert = new AlertDialog.Builder(getActivity());
 
-            for (count = 0; count > -1; count = inStream.read(buf)) {
-                outStream.write(buf, 0, count);
+        alert.setTitle("Import key");
+        alert.setMessage(R.string.credential_name);
+
+        // Set an EditText view to get user input
+        final EditText input = new EditText(getActivity());
+        alert.setView(input);
+
+        alert.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int whichButton) {
+                String alias = input.getText().toString();
+                ks.put(CryptOracleService.USER_SYMKEY + alias, key);
+                reloadData();
             }
+        });
 
-            return outStream.toByteArray();
-        } finally {
-            inStream.close();
-        }
+        alert.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int whichButton) {
+                dialog.dismiss();
+            }
+        });
+
+        alert.show();
     }
 
     @Override
@@ -288,10 +266,7 @@ public class KeysListFragment extends ListFragment implements
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == FILE_SELECT_CODE && resultCode == Activity.RESULT_OK) {
-            Uri uri = data.getData();
-            String path = resolvePath(getActivity(), uri);
-            Log.e(TAG, "got url = " + path);
-            importKey(path);
+            importKey(data);
         }
     }
 
@@ -378,14 +353,12 @@ public class KeysListFragment extends ListFragment implements
     }
 
     private void showFileChooser() {
+
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.setType("*/*");
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setClassName("com.android.certinstaller", "com.android.certinstaller.KeyFileList");
 
         try {
-            startActivityForResult(
-                    Intent.createChooser(intent, "Select a file to import"),
-                    FILE_SELECT_CODE);
+            startActivityForResult(intent, FILE_SELECT_CODE);
         } catch (android.content.ActivityNotFoundException ex) {
             Toast.makeText(getActivity(), "Please install a File Manager.",
                     Toast.LENGTH_SHORT).show();
