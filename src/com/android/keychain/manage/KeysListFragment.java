@@ -104,7 +104,7 @@ public class KeysListFragment extends ListFragment implements
         File outFile = getActivity().getFileStreamPath(alias + ".key");
         FileOutputStream out = null;
         try {
-            out = getActivity().openFileOutput(alias + ".dat", Context.MODE_WORLD_READABLE);
+            out = getActivity().openFileOutput(alias + ".key", Context.MODE_WORLD_READABLE);
             out.write(key);
 
             Intent exportIntent = new Intent(Intent.ACTION_SEND);
